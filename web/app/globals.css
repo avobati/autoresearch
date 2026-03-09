@@ -88,6 +88,57 @@ a {
   margin-top: 1rem;
 }
 
+.fund-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 0.8rem;
+}
+
+.fund-col {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.7rem;
+  background: #fffef8;
+}
+
+.fund-form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.fund-form label {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.fund-form input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.38rem 0.45rem;
+  font: inherit;
+}
+
+.fund-form button {
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: #eaf7f2;
+  color: #075f43;
+  padding: 0.42rem 0.7rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.mini-list {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.84rem;
+}
+
 .runs ul {
   list-style: none;
   padding: 0;
@@ -217,6 +268,9 @@ td:first-child {
   }
   .kpis {
     grid-template-columns: 1fr 1fr;
+  }
+  .fund-grid {
+    grid-template-columns: 1fr;
   }
 }
 

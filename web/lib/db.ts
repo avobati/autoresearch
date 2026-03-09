@@ -13,6 +13,10 @@ function getSql() {
   return neon(databaseUrl);
 }
 
+export function getDbClient() {
+  return getSql();
+}
+
 export type DashboardRun = {
   run_id: string;
   created_at: string;
@@ -89,6 +93,45 @@ export type OpportunityRow = {
   arb_sell_both_edge: number | null;
   book_age_ms: number | null;
   book_fresh: boolean | null;
+};
+
+export type FundingSummary = {
+  net_capital: number;
+  confirmed_deposits: number;
+  confirmed_allocations: number;
+  pending_intents: number;
+};
+
+export type FundingEvent = {
+  id: number;
+  created_at: string;
+  event_type: string;
+  amount_usd: number;
+  source: string | null;
+  tx_ref: string | null;
+  status: string;
+  notes: string | null;
+};
+
+export type FundingIntent = {
+  id: number;
+  created_at: string;
+  amount_usd: number;
+  note: string | null;
+  status: string;
+};
+
+export type OpportunityTask = {
+  id: number;
+  created_at: string;
+  scan_id: string | null;
+  slug: string | null;
+  question: string | null;
+  strategy_mode: string;
+  edge_score: number | null;
+  proposed_amount_usd: number | null;
+  status: string;
+  rationale: string | null;
 };
 
 export async function listRecentRuns(limit = 12): Promise<DashboardRun[]> {
@@ -248,4 +291,61 @@ export async function getTopOpportunityRows(
     LIMIT ${limit}
   `;
   return rows as OpportunityRow[];
+}
+
+export async function getFundingSummary(): Promise<FundingSummary> {
+  const sql = getSql();
+  const [events] = await sql`
+    SELECT
+      COALESCE(SUM(CASE WHEN status='confirmed' THEN amount_usd ELSE 0 END), 0)::double precision AS net_capital,
+      COALESCE(SUM(CASE WHEN status='confirmed' AND event_type='deposit' THEN amount_usd ELSE 0 END), 0)::double precision AS confirmed_deposits,
+      COALESCE(SUM(CASE WHEN status='confirmed' AND event_type='allocation' THEN ABS(amount_usd) ELSE 0 END), 0)::double precision AS confirmed_allocations
+    FROM funding_events
+  `;
+  const [intents] = await sql`
+    SELECT COUNT(*)::int AS pending_intents
+    FROM funding_intents
+    WHERE status='pending'
+  `;
+  return {
+    net_capital: Number(events?.net_capital ?? 0),
+    confirmed_deposits: Number(events?.confirmed_deposits ?? 0),
+    confirmed_allocations: Number(events?.confirmed_allocations ?? 0),
+    pending_intents: Number(intents?.pending_intents ?? 0),
+  };
+}
+
+export async function listFundingEvents(limit = 12): Promise<FundingEvent[]> {
+  const sql = getSql();
+  const rows = await sql`
+    SELECT id, created_at, event_type, amount_usd, source, tx_ref, status, notes
+    FROM funding_events
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `;
+  return rows as FundingEvent[];
+}
+
+export async function listFundingIntents(limit = 12): Promise<FundingIntent[]> {
+  const sql = getSql();
+  const rows = await sql`
+    SELECT id, created_at, amount_usd, note, status
+    FROM funding_intents
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `;
+  return rows as FundingIntent[];
+}
+
+export async function listOpportunityTasks(limit = 20): Promise<OpportunityTask[]> {
+  const sql = getSql();
+  const rows = await sql`
+    SELECT id, created_at, scan_id, slug, question, strategy_mode, edge_score, proposed_amount_usd, status, rationale
+    FROM opportunity_tasks
+    ORDER BY
+      CASE WHEN status='pending' THEN 0 ELSE 1 END,
+      created_at DESC
+    LIMIT ${limit}
+  `;
+  return rows as OpportunityTask[];
 }

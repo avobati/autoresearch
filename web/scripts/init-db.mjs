@@ -122,4 +122,54 @@ await sql`
 CREATE INDEX IF NOT EXISTS idx_market_scan_rows_scan_id ON market_scan_rows(scan_id);
 `;
 
+await sql`
+CREATE TABLE IF NOT EXISTS funding_events (
+  id BIGSERIAL PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  event_type TEXT NOT NULL,
+  amount_usd DOUBLE PRECISION NOT NULL,
+  source TEXT,
+  tx_ref TEXT,
+  status TEXT NOT NULL DEFAULT 'confirmed',
+  notes TEXT
+);
+`;
+
+await sql`
+CREATE INDEX IF NOT EXISTS idx_funding_events_created_at ON funding_events(created_at DESC);
+`;
+
+await sql`
+CREATE TABLE IF NOT EXISTS funding_intents (
+  id BIGSERIAL PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  amount_usd DOUBLE PRECISION NOT NULL,
+  note TEXT,
+  status TEXT NOT NULL DEFAULT 'pending'
+);
+`;
+
+await sql`
+CREATE INDEX IF NOT EXISTS idx_funding_intents_created_at ON funding_intents(created_at DESC);
+`;
+
+await sql`
+CREATE TABLE IF NOT EXISTS opportunity_tasks (
+  id BIGSERIAL PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  scan_id TEXT REFERENCES market_scan_runs(scan_id) ON DELETE SET NULL,
+  slug TEXT,
+  question TEXT,
+  strategy_mode TEXT NOT NULL,
+  edge_score DOUBLE PRECISION,
+  proposed_amount_usd DOUBLE PRECISION,
+  status TEXT NOT NULL DEFAULT 'pending',
+  rationale TEXT
+);
+`;
+
+await sql`
+CREATE INDEX IF NOT EXISTS idx_opportunity_tasks_status_created ON opportunity_tasks(status, created_at DESC);
+`;
+
 console.log("Neon schema initialized.");

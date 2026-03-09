@@ -40,8 +40,8 @@ Push-Location web
 npm run db:init
 npm run db:upload-scan
 npm run db:upload
+npm run queue:refresh
 Pop-Location
 
 Write-Host "==[5/5] Daily run complete=="
 Write-Host "Dashboard: https://web-kappa-ivory-72.vercel.app"
-

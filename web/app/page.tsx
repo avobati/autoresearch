@@ -1,16 +1,24 @@
 import Link from "next/link";
 import {
+  getFundingSummary,
   getScanMetrics,
   getStrategies,
   getTopOpportunityRows,
   hasDatabase,
+  listFundingEvents,
+  listFundingIntents,
+  listOpportunityTasks,
   listRecentRuns,
   listRecentScans,
   type DashboardRun,
+  type FundingEvent,
+  type FundingIntent,
   type MarketScanRun,
+  type OpportunityTask,
   type OpportunityRow,
   type StrategyRow,
 } from "../lib/db";
+import { createFundingIntent } from "./actions";
 
 type Mode = "overall" | "arb" | "maker" | "momentum";
 
@@ -98,6 +106,13 @@ export default async function Page({
     ? await getTopOpportunityRows(activeScan.scan_id, mode, 30)
     : [];
   const strategies: StrategyRow[] = activeRun ? await getStrategies(activeRun.run_id, 12) : [];
+  const funding = await getFundingSummary();
+  const fundingEvents: FundingEvent[] = await listFundingEvents(10);
+  const fundingIntents: FundingIntent[] = await listFundingIntents(8);
+  const tasks: OpportunityTask[] = await listOpportunityTasks(16);
+
+  const fundingUrl = process.env.NEXT_PUBLIC_FUNDING_PAYMENT_URL ?? null;
+  const usdcAddress = process.env.NEXT_PUBLIC_FUNDING_USDC_ADDRESS ?? null;
 
   return (
     <main className="page">
@@ -110,6 +125,98 @@ export default async function Page({
       </section>
 
       <section className="grid">
+        <article className="card full">
+          <h2>Fund The Agent</h2>
+          <div className="kpis">
+            {kpi("Net Capital (USD)", fmtN(funding.net_capital, 2))}
+            {kpi("Confirmed Deposits", fmtN(funding.confirmed_deposits, 2))}
+            {kpi("Allocated Capital", fmtN(funding.confirmed_allocations, 2))}
+            {kpi("Pending Funding Intents", String(funding.pending_intents))}
+          </div>
+
+          <div className="fund-grid">
+            <div className="fund-col">
+              <h3>Add Funding</h3>
+              {fundingUrl ? (
+                <p>
+                  <a href={fundingUrl} target="_blank" rel="noreferrer">
+                    Open Funding Checkout
+                  </a>
+                </p>
+              ) : (
+                <p className="empty">No checkout URL configured yet.</p>
+              )}
+              {usdcAddress ? (
+                <p>
+                  USDC address:
+                  <br />
+                  <span className="mono">{usdcAddress}</span>
+                </p>
+              ) : (
+                <p className="empty">No crypto funding address configured yet.</p>
+              )}
+
+              <form action={createFundingIntent} className="fund-form">
+                <label>
+                  Amount (USD)
+                  <input name="amount_usd" type="number" min="1" step="1" required />
+                </label>
+                <label>
+                  Note
+                  <input name="note" type="text" maxLength={200} placeholder="e.g. Weekly top-up" />
+                </label>
+                <button type="submit">Notify Funding Intent</button>
+              </form>
+            </div>
+
+            <div className="fund-col">
+              <h3>Latest Funding Events</h3>
+              {fundingEvents.length === 0 ? (
+                <p className="empty">No funding events recorded yet.</p>
+              ) : (
+                <ul className="mini-list">
+                  {fundingEvents.map((ev) => (
+                    <li key={ev.id}>
+                      <span className="mono">{fmtTs(ev.created_at)}</span> | {ev.event_type} |{" "}
+                      <span className={pnlClass(ev.amount_usd)}>{fmtN(ev.amount_usd, 2)}</span> USD | {ev.status}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="fund-col">
+              <h3>Pending Opportunity Tasks</h3>
+              {tasks.length === 0 ? (
+                <p className="empty">No queued tasks yet.</p>
+              ) : (
+                <ul className="mini-list">
+                  {tasks.map((task) => (
+                    <li key={task.id}>
+                      <strong>{task.strategy_mode}</strong> | {task.slug ?? "n/a"} | edge {fmtN(task.edge_score, 4)} |
+                      size {fmtN(task.proposed_amount_usd, 2)} USD | {task.status}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          <h3>Funding Intents</h3>
+          {fundingIntents.length === 0 ? (
+            <p className="empty">No intents yet.</p>
+          ) : (
+            <ul className="mini-list">
+              {fundingIntents.map((fi) => (
+                <li key={fi.id}>
+                  <span className="mono">{fmtTs(fi.created_at)}</span> | {fmtN(fi.amount_usd, 2)} USD | {fi.status} |{" "}
+                  {fi.note ?? "-"}
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
+
         <article className="card runs">
           <h2>Scan Runs</h2>
           {scans.length === 0 ? (

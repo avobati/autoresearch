@@ -24,6 +24,7 @@ Initialize schema and upload latest run data:
 npm run db:init
 npm run db:upload
 npm run db:upload-scan
+npm run queue:refresh
 ```
 
 Run locally:
@@ -49,6 +50,7 @@ cd web
 npm run db:init
 npm run db:upload
 npm run db:upload-scan
+npm run queue:refresh
 
 ```
 
@@ -64,4 +66,18 @@ Then from `web/`:
 
 ```bash
 npm run db:upload-scan
+```
+
+## Funding workflow
+
+Record a confirmed funding event:
+
+```bash
+npm run db:fund -- --type deposit --amount 200 --source "manual" --notes "Initial capital"
+```
+
+Generate pending opportunity tasks based on latest scan + available capital:
+
+```bash
+npm run queue:refresh
 ```
