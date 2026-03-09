@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import {
   clusterApiUrl,
   Connection,
@@ -10,14 +10,18 @@ import {
   Transaction,
 } from "@solana/web3.js";
 
-type WithdrawalAction = (formData: FormData) => Promise<void>;
+type FormAction = (formData: FormData) => Promise<void>;
+type StatefulAction = (
+  prevState: { ok: boolean; message: string } | null,
+  formData: FormData
+) => Promise<{ ok: boolean; message: string }>;
 
 type Props = {
   treasuryAddress: string | null;
   network: string;
   rpcUrl: string | null;
-  createWithdrawalRequestAction: WithdrawalAction;
-  recordWalletDepositAction: WithdrawalAction;
+  createWithdrawalRequestAction: StatefulAction;
+  recordWalletDepositAction: FormAction;
 };
 
 type SolanaWalletProvider = {
@@ -102,6 +106,7 @@ export function SolanaWalletPanel({
 
   const providerAvailable = useMemo(() => Boolean(getProvider()), []);
   const rpcEndpoints = useMemo(() => buildRpcEndpoints(network, rpcUrl), [network, rpcUrl]);
+  const [withdrawState, withdrawAction, withdrawPending] = useActionState(createWithdrawalRequestAction, null);
 
   useEffect(() => {
     const provider = getProvider();
@@ -342,7 +347,11 @@ export function SolanaWalletPanel({
       </form>
 
       <h3>Withdraw To Connected Wallet</h3>
-      <form action={createWithdrawalRequestAction} className="fund-form">
+      <p className="wallet-note">
+        This creates a payout request first. It appears in recent withdrawals with <span className="mono">pending</span>{" "}
+        status until processed.
+      </p>
+      <form action={withdrawAction} className="fund-form">
         <label>
           Amount (USD)
           <input name="amount_usd" type="number" min="1" step="1" required />
@@ -369,10 +378,13 @@ export function SolanaWalletPanel({
           Note
           <input name="note" type="text" maxLength={200} placeholder="e.g. Transfer to my wallet" />
         </label>
-        <button type="submit" disabled={!walletAddress}>
-          Request Withdrawal To Connected Wallet
+        <button type="submit" disabled={!walletAddress || withdrawPending}>
+          {withdrawPending ? "Submitting..." : "Request Withdrawal To Connected Wallet"}
         </button>
       </form>
+      {withdrawState?.message && (
+        <p className={withdrawState.ok ? "good" : "bad"}>{withdrawState.message}</p>
+      )}
     </div>
   );
 }

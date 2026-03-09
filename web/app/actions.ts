@@ -3,6 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { getDbClient } from "../lib/db";
 
+export type ActionState = {
+  ok: boolean;
+  message: string;
+};
+
 export async function createFundingIntent(formData: FormData) {
   const amountRaw = formData.get("amount_usd");
   const noteRaw = formData.get("note");
@@ -57,7 +62,15 @@ export async function recordWalletDeposit(formData: FormData) {
 
 const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
-export async function createWithdrawalRequest(formData: FormData) {
+export async function createWithdrawalRequest(
+  prevOrFormData: ActionState | FormData | null,
+  maybeFormData?: FormData
+): Promise<ActionState> {
+  const formData = prevOrFormData instanceof FormData ? prevOrFormData : maybeFormData;
+  if (!formData) {
+    return { ok: false, message: "Invalid withdrawal form submission." };
+  }
+
   const amountRaw = formData.get("amount_usd");
   const assetRaw = formData.get("asset");
   const destinationRaw = formData.get("destination_address");
@@ -69,20 +82,28 @@ export async function createWithdrawalRequest(formData: FormData) {
   const note = typeof noteRaw === "string" ? noteRaw.trim() : "";
 
   if (!Number.isFinite(amount) || amount <= 0) {
-    return;
+    return { ok: false, message: "Enter a valid withdrawal amount." };
   }
   if (asset !== "SOL" && asset !== "USDC") {
-    return;
+    return { ok: false, message: "Select SOL or USDC." };
   }
   if (!SOLANA_ADDRESS_REGEX.test(destinationAddress)) {
-    return;
+    return { ok: false, message: "Connect a valid Solana wallet address first." };
   }
 
   const sql = getDbClient();
-  await sql`
+  const rows = await sql`
     INSERT INTO withdrawal_requests (amount_usd, asset, destination_address, note, status)
     VALUES (${amount}, ${asset}, ${destinationAddress}, ${note || null}, 'pending')
+    RETURNING id
   `;
 
   revalidatePath("/");
+  const requestId = rows[0]?.id ? Number(rows[0].id) : null;
+  return {
+    ok: true,
+    message: requestId
+      ? `Withdrawal request #${requestId} submitted (status: pending).`
+      : "Withdrawal request submitted (status: pending).",
+  };
 }
