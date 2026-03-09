@@ -134,6 +134,17 @@ export type OpportunityTask = {
   rationale: string | null;
 };
 
+export type WithdrawalRequest = {
+  id: number;
+  created_at: string;
+  amount_usd: number;
+  asset: string;
+  destination_address: string;
+  note: string | null;
+  status: string;
+  processed_tx_ref: string | null;
+};
+
 export async function listRecentRuns(limit = 12): Promise<DashboardRun[]> {
   const sql = getSql();
   const rows = await sql`
@@ -348,4 +359,15 @@ export async function listOpportunityTasks(limit = 20): Promise<OpportunityTask[
     LIMIT ${limit}
   `;
   return rows as OpportunityTask[];
+}
+
+export async function listWithdrawalRequests(limit = 12): Promise<WithdrawalRequest[]> {
+  const sql = getSql();
+  const rows = await sql`
+    SELECT id, created_at, amount_usd, asset, destination_address, note, status, processed_tx_ref
+    FROM withdrawal_requests
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `;
+  return rows as WithdrawalRequest[];
 }

@@ -11,7 +11,8 @@
     "db:upload": "node scripts/upload-results.mjs",
     "db:upload-scan": "node scripts/upload-market-scan.mjs",
     "db:fund": "node scripts/fund-account.mjs",
-    "queue:refresh": "node scripts/refresh-opportunity-queue.mjs"
+    "queue:refresh": "node scripts/refresh-opportunity-queue.mjs",
+    "withdraw:process": "node scripts/process-withdrawal.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",

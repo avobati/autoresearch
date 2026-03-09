@@ -16,6 +16,9 @@ Create `.env.local`:
 
 ```bash
 DATABASE_URL=postgresql://<user>:<password>@<host>/<db>?sslmode=require
+NEXT_PUBLIC_SOLANA_ADDRESS=<your_solana_deposit_wallet>
+NEXT_PUBLIC_SOLANA_NETWORK=mainnet
+NEXT_PUBLIC_SOLANA_USDC_MINT=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
 ```
 
 Initialize schema and upload latest run data:
@@ -74,6 +77,12 @@ Record a confirmed funding event:
 
 ```bash
 npm run db:fund -- --type deposit --amount 200 --source "manual" --notes "Initial capital"
+```
+
+Process a pending withdrawal request (`id` from dashboard):
+
+```bash
+npm run withdraw:process -- --id 1 --status processed --tx-ref "<solana_tx_signature>"
 ```
 
 Generate pending opportunity tasks based on latest scan + available capital:

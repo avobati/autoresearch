@@ -154,6 +154,23 @@ CREATE INDEX IF NOT EXISTS idx_funding_intents_created_at ON funding_intents(cre
 `;
 
 await sql`
+CREATE TABLE IF NOT EXISTS withdrawal_requests (
+  id BIGSERIAL PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  amount_usd DOUBLE PRECISION NOT NULL,
+  asset TEXT NOT NULL DEFAULT 'USDC',
+  destination_address TEXT NOT NULL,
+  note TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  processed_tx_ref TEXT
+);
+`;
+
+await sql`
+CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_status_created ON withdrawal_requests(status, created_at DESC);
+`;
+
+await sql`
 CREATE TABLE IF NOT EXISTS opportunity_tasks (
   id BIGSERIAL PRIMARY KEY,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

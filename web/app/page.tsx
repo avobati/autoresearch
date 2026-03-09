@@ -8,6 +8,7 @@ import {
   listFundingEvents,
   listFundingIntents,
   listOpportunityTasks,
+  listWithdrawalRequests,
   listRecentRuns,
   listRecentScans,
   type DashboardRun,
@@ -17,8 +18,9 @@ import {
   type OpportunityTask,
   type OpportunityRow,
   type StrategyRow,
+  type WithdrawalRequest,
 } from "../lib/db";
-import { createFundingIntent } from "./actions";
+import { createFundingIntent, createWithdrawalRequest } from "./actions";
 
 type Mode = "overall" | "arb" | "maker" | "momentum";
 
@@ -66,6 +68,21 @@ function modeHref(scanId: string, mode: Mode) {
   return `/?scan=${encodeURIComponent(scanId)}&mode=${mode}`;
 }
 
+function buildSolanaPayUrl(address: string, params: Record<string, string | number | null | undefined>) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === null || value === undefined || value === "") continue;
+    search.set(key, String(value));
+  }
+  const query = search.toString();
+  return `solana:${address}${query ? `?${query}` : ""}`;
+}
+
+function envText(value: string | undefined | null) {
+  const trimmed = (value ?? "").trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 export default async function Page({
   searchParams,
 }: {
@@ -110,9 +127,28 @@ export default async function Page({
   const fundingEvents: FundingEvent[] = await listFundingEvents(10);
   const fundingIntents: FundingIntent[] = await listFundingIntents(8);
   const tasks: OpportunityTask[] = await listOpportunityTasks(16);
+  const withdrawalRequests: WithdrawalRequest[] = await listWithdrawalRequests(8);
 
-  const fundingUrl = process.env.NEXT_PUBLIC_FUNDING_PAYMENT_URL ?? null;
-  const usdcAddress = process.env.NEXT_PUBLIC_FUNDING_USDC_ADDRESS ?? null;
+  const fundingUrl = envText(process.env.NEXT_PUBLIC_FUNDING_PAYMENT_URL);
+  const solanaAddress =
+    envText(process.env.NEXT_PUBLIC_SOLANA_ADDRESS) ?? envText(process.env.NEXT_PUBLIC_FUNDING_USDC_ADDRESS);
+  const solanaNetwork = envText(process.env.NEXT_PUBLIC_SOLANA_NETWORK) ?? "mainnet";
+  const solanaUsdcMint =
+    envText(process.env.NEXT_PUBLIC_SOLANA_USDC_MINT) ?? "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+  const solanaLabel = envText(process.env.NEXT_PUBLIC_SOLANA_LABEL) ?? "Polymarket Profit Lab";
+  const solanaMessage = envText(process.env.NEXT_PUBLIC_SOLANA_MESSAGE) ?? "Funding deposit";
+  const hasSolanaAddress = Boolean(solanaAddress && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(solanaAddress));
+  const solDepositLink = hasSolanaAddress
+    ? buildSolanaPayUrl(solanaAddress!, { amount: 0.1, label: solanaLabel, message: solanaMessage })
+    : null;
+  const usdcDepositLink = hasSolanaAddress
+    ? buildSolanaPayUrl(solanaAddress!, {
+        amount: 25,
+        "spl-token": solanaUsdcMint,
+        label: solanaLabel,
+        message: solanaMessage,
+      })
+    : null;
 
   return (
     <main className="page">
@@ -136,7 +172,7 @@ export default async function Page({
 
           <div className="fund-grid">
             <div className="fund-col">
-              <h3>Add Funding</h3>
+              <h3>Deposit (Solana)</h3>
               {fundingUrl ? (
                 <p>
                   <a href={fundingUrl} target="_blank" rel="noreferrer">
@@ -144,16 +180,32 @@ export default async function Page({
                   </a>
                 </p>
               ) : (
-                <p className="empty">No checkout URL configured yet.</p>
+                <p className="empty">No checkout URL configured yet. Use direct Solana deposits below.</p>
               )}
-              {usdcAddress ? (
-                <p>
-                  USDC address:
-                  <br />
-                  <span className="mono">{usdcAddress}</span>
-                </p>
+
+              {hasSolanaAddress ? (
+                <>
+                  <p>
+                    Network: <span className="mono">{solanaNetwork}</span>
+                    <br />
+                    Deposit address:
+                    <br />
+                    <span className="mono">{solanaAddress}</span>
+                  </p>
+                  <p>
+                    <a href={solDepositLink ?? "#"} target="_blank" rel="noreferrer">
+                      Deposit 0.1 SOL
+                    </a>{" "}
+                    |{" "}
+                    <a href={usdcDepositLink ?? "#"} target="_blank" rel="noreferrer">
+                      Deposit 25 USDC
+                    </a>
+                  </p>
+                </>
               ) : (
-                <p className="empty">No crypto funding address configured yet.</p>
+                <p className="empty">
+                  Configure <span className="mono">NEXT_PUBLIC_SOLANA_ADDRESS</span> to enable crypto deposit links.
+                </p>
               )}
 
               <form action={createFundingIntent} className="fund-form">
@@ -195,6 +247,54 @@ export default async function Page({
                     <li key={task.id}>
                       <strong>{task.strategy_mode}</strong> | {task.slug ?? "n/a"} | edge {fmtN(task.edge_score, 4)} |
                       size {fmtN(task.proposed_amount_usd, 2)} USD | {task.status}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="fund-col">
+              <h3>Request Withdrawal</h3>
+              <form action={createWithdrawalRequest} className="fund-form">
+                <label>
+                  Amount (USD)
+                  <input name="amount_usd" type="number" min="1" step="1" required />
+                </label>
+                <label>
+                  Asset
+                  <select name="asset" defaultValue="USDC" required>
+                    <option value="USDC">USDC</option>
+                    <option value="SOL">SOL</option>
+                  </select>
+                </label>
+                <label>
+                  Solana destination address
+                  <input
+                    name="destination_address"
+                    type="text"
+                    minLength={32}
+                    maxLength={44}
+                    required
+                    placeholder="Base58 Solana address"
+                  />
+                </label>
+                <label>
+                  Note
+                  <input name="note" type="text" maxLength={200} placeholder="e.g. Weekly payout" />
+                </label>
+                <button type="submit">Create Withdrawal Request</button>
+              </form>
+
+              <h3>Recent Withdrawals</h3>
+              {withdrawalRequests.length === 0 ? (
+                <p className="empty">No withdrawal requests yet.</p>
+              ) : (
+                <ul className="mini-list">
+                  {withdrawalRequests.map((wr) => (
+                    <li key={wr.id}>
+                      <span className="mono">{fmtTs(wr.created_at)}</span> | {fmtN(wr.amount_usd, 2)} USD | {wr.asset} |
+                      {` ${wr.status} `}| {wr.destination_address}
+                      {wr.processed_tx_ref ? ` | tx ${wr.processed_tx_ref}` : ""}
                     </li>
                   ))}
                 </ul>

@@ -121,6 +121,14 @@ a {
   font: inherit;
 }
 
+.fund-form select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.38rem 0.45rem;
+  font: inherit;
+  background: #fff;
+}
+
 .fund-form button {
   border: 1px solid var(--accent);
   border-radius: 8px;
