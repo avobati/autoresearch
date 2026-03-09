@@ -58,6 +58,31 @@ function shortAddress(value: string | null) {
   return `${value.slice(0, 4)}...${value.slice(-4)}`;
 }
 
+function buildRpcEndpoints(network: string, rpcUrl: string | null) {
+  const primary = rpcUrl?.trim() ? [rpcUrl.trim()] : [];
+  const cluster = clusterApiUrl(clusterFromNetwork(network));
+  if (network === "devnet") {
+    return Array.from(new Set([...primary, cluster]));
+  }
+  if (network === "testnet") {
+    return Array.from(new Set([...primary, cluster]));
+  }
+  // Public fallback set for mainnet to reduce single-endpoint failures in browser contexts.
+  return Array.from(
+    new Set([
+      ...primary,
+      cluster,
+      "https://rpc.ankr.com/solana",
+      "https://solana-rpc.publicnode.com",
+    ])
+  );
+}
+
+function isRpcForbiddenError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  return error.message.includes("403") || error.message.toLowerCase().includes("access forbidden");
+}
+
 export function SolanaWalletPanel({
   treasuryAddress,
   network,
@@ -73,7 +98,7 @@ export function SolanaWalletPanel({
   const [depositSig, setDepositSig] = useState<string | null>(null);
 
   const providerAvailable = useMemo(() => Boolean(getProvider()), []);
-  const endpoint = rpcUrl ?? clusterApiUrl(clusterFromNetwork(network));
+  const rpcEndpoints = useMemo(() => buildRpcEndpoints(network, rpcUrl), [network, rpcUrl]);
 
   useEffect(() => {
     const provider = getProvider();
@@ -132,18 +157,45 @@ export function SolanaWalletPanel({
     setDepositStatus(null);
     setDepositSig(null);
     try {
-      const connection = new Connection(endpoint, "confirmed");
+      let connection: Connection | null = null;
+      let latest: { blockhash: string; lastValidBlockHeight: number } | null = null;
+      const rpcErrors: string[] = [];
+
+      for (const endpoint of rpcEndpoints) {
+        try {
+          const candidate = new Connection(endpoint, "confirmed");
+          const blockhash = await candidate.getLatestBlockhash("finalized");
+          connection = candidate;
+          latest = blockhash;
+          break;
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          rpcErrors.push(`${endpoint}: ${msg}`);
+        }
+      }
+
+      if (!connection || !latest) {
+        throw new Error(`Unable to reach a Solana RPC endpoint. ${rpcErrors.join(" | ")}`);
+      }
+
       const from = new PublicKey(walletAddress);
       const to = new PublicKey(treasuryAddress);
       const lamports = Math.round(amount * LAMPORTS_PER_SOL);
-      const balance = await connection.getBalance(from, "confirmed");
-      const feeBuffer = 10_000;
-      if (balance < lamports + feeBuffer) {
-        setDepositStatus("Insufficient SOL balance for amount + network fee.");
-        setPendingDeposit(false);
-        return;
+
+      try {
+        const balance = await connection.getBalance(from, "confirmed");
+        const feeBuffer = 10_000;
+        if (balance < lamports + feeBuffer) {
+          setDepositStatus("Insufficient SOL balance for amount + network fee.");
+          setPendingDeposit(false);
+          return;
+        }
+      } catch (error) {
+        if (!isRpcForbiddenError(error)) {
+          const msg = error instanceof Error ? error.message : String(error);
+          setDepositStatus(`Balance check skipped: ${msg}`);
+        }
       }
-      const latest = await connection.getLatestBlockhash("finalized");
 
       const tx = new Transaction();
       tx.feePayer = from;
@@ -174,7 +226,9 @@ export function SolanaWalletPanel({
         await connection.confirmTransaction(signature, "confirmed");
         setDepositStatus("Deposit confirmed on-chain. Use Notify Funding Intent below to record it in the dashboard.");
       } catch {
-        setDepositStatus("Transaction submitted. Confirmation is pending; check the tx link and retry status in wallet.");
+        setDepositStatus(
+          "Transaction submitted. Confirmation is pending or RPC is rate-limited; check the tx link and wallet activity."
+        );
       }
     } catch (error) {
       const message =
