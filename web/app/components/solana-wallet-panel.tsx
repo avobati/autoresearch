@@ -17,6 +17,7 @@ type Props = {
   network: string;
   rpcUrl: string | null;
   createWithdrawalRequestAction: WithdrawalAction;
+  recordWalletDepositAction: WithdrawalAction;
 };
 
 type SolanaWalletProvider = {
@@ -88,6 +89,7 @@ export function SolanaWalletPanel({
   network,
   rpcUrl,
   createWithdrawalRequestAction,
+  recordWalletDepositAction,
 }: Props) {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [walletError, setWalletError] = useState<string | null>(null);
@@ -96,6 +98,7 @@ export function SolanaWalletPanel({
   const [depositSol, setDepositSol] = useState("0.1");
   const [depositStatus, setDepositStatus] = useState<string | null>(null);
   const [depositSig, setDepositSig] = useState<string | null>(null);
+  const [depositUsd, setDepositUsd] = useState("");
 
   const providerAvailable = useMemo(() => Boolean(getProvider()), []);
   const rpcEndpoints = useMemo(() => buildRpcEndpoints(network, rpcUrl), [network, rpcUrl]);
@@ -221,6 +224,7 @@ export function SolanaWalletPanel({
       }
 
       setDepositSig(signature);
+      setDepositUsd("");
 
       try {
         await connection.confirmTransaction(signature, "confirmed");
@@ -284,12 +288,40 @@ export function SolanaWalletPanel({
 
       {depositStatus && <p className="wallet-note">{depositStatus}</p>}
       {depositSig && (
-        <p className="wallet-note">
-          Tx:{" "}
-          <a href={`https://solscan.io/tx/${depositSig}`} target="_blank" rel="noreferrer">
-            {depositSig}
-          </a>
-        </p>
+        <>
+          <p className="wallet-note">
+            Tx:{" "}
+            <a href={`https://solscan.io/tx/${depositSig}`} target="_blank" rel="noreferrer">
+              {depositSig}
+            </a>
+          </p>
+          <form action={recordWalletDepositAction} className="fund-form">
+            <input type="hidden" name="tx_ref" value={depositSig} />
+            <label>
+              USD value to record
+              <input
+                name="amount_usd"
+                type="number"
+                min="1"
+                step="0.01"
+                required
+                value={depositUsd}
+                onChange={(e) => setDepositUsd(e.target.value)}
+                placeholder="Enter USD value of this deposit"
+              />
+            </label>
+            <label>
+              Note
+              <input
+                name="note"
+                type="text"
+                maxLength={200}
+                defaultValue={`Wallet deposit ${depositSig.slice(0, 8)}...`}
+              />
+            </label>
+            <button type="submit">Record Deposit On Dashboard</button>
+          </form>
+        </>
       )}
 
       <h3>Withdraw To Connected Wallet</h3>

@@ -20,7 +20,7 @@ import {
   type StrategyRow,
   type WithdrawalRequest,
 } from "../lib/db";
-import { createFundingIntent, createWithdrawalRequest } from "./actions";
+import { createFundingIntent, createWithdrawalRequest, recordWalletDeposit } from "./actions";
 import { SolanaWalletPanel } from "./components/solana-wallet-panel";
 
 type Mode = "overall" | "arb" | "maker" | "momentum";
@@ -227,6 +227,7 @@ export default async function Page({
                 network={solanaNetwork}
                 rpcUrl={solanaRpcUrl}
                 createWithdrawalRequestAction={createWithdrawalRequest}
+                recordWalletDepositAction={recordWalletDeposit}
               />
             </div>
 
