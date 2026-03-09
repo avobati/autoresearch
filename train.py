@@ -9,6 +9,7 @@ os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
 os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
 
 import gc
+import importlib.util
 import time
 from dataclasses import dataclass, asdict
 
@@ -16,13 +17,30 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from kernels import get_kernel
-cap = torch.cuda.get_device_capability()
-# varunneal's FA3 is Hopper only, use kernels-community on non-Hopper GPUs
-repo = "varunneal/flash-attention-3" if cap == (9, 0) else "kernels-community/flash-attn3"
-fa3 = get_kernel(repo).flash_attn_interface
+fa3 = None
+try:
+    from kernels import get_kernel
+    cap = torch.cuda.get_device_capability()
+    # varunneal's FA3 is Hopper only, use kernels-community on non-Hopper GPUs
+    repo = "varunneal/flash-attention-3" if cap == (9, 0) else "kernels-community/flash-attn3"
+    fa3 = get_kernel(repo).flash_attn_interface
+except Exception as e:
+    print(f"FlashAttention kernel unavailable, falling back to PyTorch SDPA: {e}")
 
 from prepare import MAX_SEQ_LEN, TIME_BUDGET, Tokenizer, make_dataloader, evaluate_bpb
+
+HAS_TRITON = importlib.util.find_spec("triton") is not None
+ENABLE_COMPILE = (os.name != "nt") and HAS_TRITON
+if not ENABLE_COMPILE:
+    print("torch.compile disabled (Windows and/or Triton not available); using eager mode.")
+
+
+def maybe_compile(*, dynamic=False, fullgraph=True):
+    def decorator(fn):
+        if ENABLE_COMPILE:
+            return torch.compile(fn, dynamic=dynamic, fullgraph=fullgraph)
+        return fn
+    return decorator
 
 # ---------------------------------------------------------------------------
 # GPT Model
@@ -89,7 +107,33 @@ class CausalSelfAttention(nn.Module):
         q, k = apply_rotary_emb(q, cos, sin), apply_rotary_emb(k, cos, sin)
         q, k = norm(q), norm(k)
 
-        y = fa3.flash_attn_func(q, k, v, causal=True, window_size=window_size)
+        if fa3 is not None:
+            y = fa3.flash_attn_func(q, k, v, causal=True, window_size=window_size)
+        else:
+            # Fallback path for platforms where FlashAttention kernels are unavailable.
+            q = q.transpose(1, 2)  # (B, Hq, T, D)
+            k = k.transpose(1, 2)  # (B, Hk, T, D)
+            v = v.transpose(1, 2)  # (B, Hk, T, D)
+            if self.n_kv_head != self.n_head:
+                repeat_factor = self.n_head // self.n_kv_head
+                k = k.repeat_interleave(repeat_factor, dim=1)
+                v = v.repeat_interleave(repeat_factor, dim=1)
+
+            left_window = window_size[0] if isinstance(window_size, (tuple, list)) else int(window_size)
+            attn_mask = None
+            is_causal = True
+            if 0 < left_window < T:
+                idx = torch.arange(T, device=x.device)
+                # Keep keys in [i-left_window+1, i] for each query position i.
+                valid = (idx[None, :] <= idx[:, None]) & (idx[None, :] >= (idx[:, None] - left_window + 1))
+                attn_mask = torch.full((T, T), float("-inf"), device=x.device, dtype=q.dtype)
+                attn_mask[valid] = 0
+                is_causal = False
+
+            y = F.scaled_dot_product_attention(
+                q, k, v, attn_mask=attn_mask, dropout_p=0.0, is_causal=is_causal
+            )
+            y = y.transpose(1, 2)
         y = y.contiguous().view(B, T, -1)
         y = self.c_proj(y)
         return y
@@ -301,7 +345,7 @@ polar_express_coeffs = [
     (2.3465413258596377, -1.7097828382687081, 0.42323551169305323),
 ]
 
-@torch.compile(dynamic=False, fullgraph=True)
+@maybe_compile(dynamic=False, fullgraph=True)
 def adamw_step_fused(p, grad, exp_avg, exp_avg_sq, step_t, lr_t, beta1_t, beta2_t, eps_t, wd_t):
     p.mul_(1 - lr_t * wd_t)
     exp_avg.lerp_(grad, 1 - beta1_t)
@@ -312,7 +356,7 @@ def adamw_step_fused(p, grad, exp_avg, exp_avg_sq, step_t, lr_t, beta1_t, beta2_
     step_size = lr_t / bias1
     p.add_(exp_avg / denom, alpha=-step_size)
 
-@torch.compile(dynamic=False, fullgraph=True)
+@maybe_compile(dynamic=False, fullgraph=True)
 def muon_step_fused(stacked_grads, stacked_params, momentum_buffer, second_momentum_buffer,
                     momentum_t, lr_t, wd_t, beta2_t, ns_steps, red_dim):
     # Nesterov momentum
@@ -461,6 +505,35 @@ device = torch.device("cuda")
 autocast_ctx = torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16)
 H100_BF16_PEAK_FLOPS = 989.5e12
 
+def get_env_int(name, default):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        print(f"Ignoring invalid {name}={value!r}, expected integer.")
+        return default
+
+gpu_mem_gb = torch.cuda.get_device_properties(device).total_memory / (1024 ** 3)
+low_vram_mode = os.getenv("AUTORESEARCH_LOW_VRAM_PROFILE", "auto").strip().lower()
+if low_vram_mode in ("1", "true", "yes", "on"):
+    use_low_vram_profile = True
+elif low_vram_mode in ("0", "false", "no", "off"):
+    use_low_vram_profile = False
+else:
+    use_low_vram_profile = gpu_mem_gb <= 10
+
+if use_low_vram_profile:
+    # Auto-tune to a safer profile for smaller GPUs (e.g., 8 GB cards on Windows).
+    DEPTH = min(DEPTH, get_env_int("AUTORESEARCH_LOW_VRAM_DEPTH", 4))
+    DEVICE_BATCH_SIZE = min(DEVICE_BATCH_SIZE, get_env_int("AUTORESEARCH_LOW_VRAM_DEVICE_BATCH_SIZE", 8))
+    TOTAL_BATCH_SIZE = min(TOTAL_BATCH_SIZE, get_env_int("AUTORESEARCH_LOW_VRAM_TOTAL_BATCH_SIZE", 2**14))
+    print(
+        f"Low-VRAM profile enabled ({gpu_mem_gb:.1f} GB, mode={low_vram_mode}): "
+        f"DEPTH={DEPTH}, DEVICE_BATCH_SIZE={DEVICE_BATCH_SIZE}, TOTAL_BATCH_SIZE={TOTAL_BATCH_SIZE}"
+    )
+
 tokenizer = Tokenizer.from_directory()
 vocab_size = tokenizer.get_vocab_size()
 print(f"Vocab size: {vocab_size:,}")
@@ -492,7 +565,10 @@ num_flops_per_token = model.estimate_flops()
 print(f"Estimated FLOPs per token: {num_flops_per_token:e}")
 
 tokens_per_fwdbwd = DEVICE_BATCH_SIZE * MAX_SEQ_LEN
-assert TOTAL_BATCH_SIZE % tokens_per_fwdbwd == 0
+if TOTAL_BATCH_SIZE < tokens_per_fwdbwd:
+    TOTAL_BATCH_SIZE = tokens_per_fwdbwd
+if TOTAL_BATCH_SIZE % tokens_per_fwdbwd != 0:
+    TOTAL_BATCH_SIZE = ((TOTAL_BATCH_SIZE + tokens_per_fwdbwd - 1) // tokens_per_fwdbwd) * tokens_per_fwdbwd
 grad_accum_steps = TOTAL_BATCH_SIZE // tokens_per_fwdbwd
 
 optimizer = model.setup_optimizer(
@@ -504,7 +580,8 @@ optimizer = model.setup_optimizer(
     weight_decay=WEIGHT_DECAY,
 )
 
-model = torch.compile(model, dynamic=False)
+if ENABLE_COMPILE:
+    model = torch.compile(model, dynamic=False)
 
 train_loader = make_dataloader(tokenizer, DEVICE_BATCH_SIZE, MAX_SEQ_LEN, "train")
 x, y, epoch = next(train_loader)  # prefetch first batch
