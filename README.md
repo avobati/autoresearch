@@ -102,6 +102,20 @@ uv run python polymarket_research/backtest_delay.py --grid --input data/polymark
 
 See `polymarket_research/README.md` for details.
 
+## Optional: Results Website (Vercel + Neon)
+
+This fork also includes a Next.js dashboard under `web/` that reads uploaded run summaries from Neon.
+
+```bash
+cd web
+npm install
+npm run db:init
+npm run db:upload
+npm run dev
+```
+
+Deployment guide is in `web/README.md`.
+
 ## License
 
 MIT

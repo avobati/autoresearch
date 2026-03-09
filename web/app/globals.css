@@ -1,0 +1,192 @@
+:root {
+  --bg: #f3f3e8;
+  --card: #fffdf5;
+  --ink: #1a221c;
+  --muted: #4c5c51;
+  --accent: #0f8f64;
+  --danger: #b23c2d;
+  --line: #d9d5c5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-display), "Segoe UI", sans-serif;
+  color: var(--ink);
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 90% 10%, rgba(15, 143, 100, 0.2), transparent 35%),
+    radial-gradient(circle at 10% 90%, rgba(178, 60, 45, 0.12), transparent 30%),
+    linear-gradient(165deg, #eceadf, #f9f6ea 30%, #f3f3e8 70%);
+}
+
+a {
+  color: var(--accent);
+}
+
+.page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 2.5rem 1rem 4rem;
+}
+
+.hero {
+  margin-bottom: 1rem;
+  animation: rise 450ms ease-out both;
+}
+
+.hero h1 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.7rem, 2.8vw, 2.7rem);
+  letter-spacing: -0.03em;
+}
+
+.hero p {
+  margin: 0.2rem 0;
+  color: var(--muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 1rem;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 1rem;
+  box-shadow: 0 10px 24px rgba(20, 28, 24, 0.06);
+}
+
+.runs {
+  grid-column: span 5;
+}
+
+.details {
+  grid-column: span 7;
+}
+
+.runs ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.run-item {
+  padding: 0.65rem 0.7rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fffef8;
+}
+
+.run-item.active {
+  border-color: var(--accent);
+  background: #eef9f4;
+}
+
+.run-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.mono {
+  font-family: var(--font-mono), "Consolas", monospace;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 0.8rem;
+}
+
+.kpi {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.6rem;
+  background: #fffcf2;
+}
+
+.kpi .label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin-bottom: 0.2rem;
+}
+
+.kpi .value {
+  font-family: var(--font-mono), "Consolas", monospace;
+  font-size: 1.05rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.89rem;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--line);
+  padding: 0.44rem;
+  text-align: right;
+}
+
+th:first-child,
+td:first-child {
+  text-align: left;
+}
+
+.good {
+  color: var(--accent);
+}
+
+.bad {
+  color: var(--danger);
+}
+
+.empty {
+  color: var(--muted);
+  font-style: italic;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 980px) {
+  .runs,
+  .details {
+    grid-column: span 12;
+  }
+  .kpis {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .kpis {
+    grid-template-columns: 1fr;
+  }
+}
+

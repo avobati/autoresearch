@@ -148,13 +148,29 @@ def fetch_book_top(session: requests.Session, token_id: str) -> Dict[str, Option
     payload = response.json()
     bids = payload.get("bids") or []
     asks = payload.get("asks") or []
-    top_bid = bids[0] if bids else {}
-    top_ask = asks[0] if asks else {}
+
+    bid_levels: List[Tuple[float, float]] = []
+    for row in bids:
+        price = _as_float(row.get("price"), default=float("nan"))
+        size = _as_float(row.get("size"), default=float("nan"))
+        if price == price and size == size:
+            bid_levels.append((price, size))
+
+    ask_levels: List[Tuple[float, float]] = []
+    for row in asks:
+        price = _as_float(row.get("price"), default=float("nan"))
+        size = _as_float(row.get("size"), default=float("nan"))
+        if price == price and size == size:
+            ask_levels.append((price, size))
+
+    best_bid = max(bid_levels, key=lambda x: x[0]) if bid_levels else None
+    best_ask = min(ask_levels, key=lambda x: x[0]) if ask_levels else None
+
     return {
-        "bid": _as_float(top_bid.get("price"), default=float("nan")) if top_bid else None,
-        "ask": _as_float(top_ask.get("price"), default=float("nan")) if top_ask else None,
-        "bid_size": _as_float(top_bid.get("size"), default=float("nan")) if top_bid else None,
-        "ask_size": _as_float(top_ask.get("size"), default=float("nan")) if top_ask else None,
+        "bid": best_bid[0] if best_bid else None,
+        "ask": best_ask[0] if best_ask else None,
+        "bid_size": best_bid[1] if best_bid else None,
+        "ask_size": best_ask[1] if best_ask else None,
         "book_ts_ms": _as_float(payload.get("timestamp"), default=float("nan")) if payload.get("timestamp") else None,
     }
 
@@ -180,4 +196,3 @@ def fetch_coinbase_ticker(session: requests.Session, product: str = "BTC-USD") -
         "size": _as_float(payload.get("size"), default=float("nan")),
         "exchange_time": payload.get("time"),
     }
-
