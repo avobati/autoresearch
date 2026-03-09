@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "db:init": "node scripts/init-db.mjs",
-    "db:upload": "node scripts/upload-results.mjs"
+    "db:upload": "node scripts/upload-results.mjs",
+    "db:upload-scan": "node scripts/upload-market-scan.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",

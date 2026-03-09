@@ -1,6 +1,9 @@
 # Web Dashboard (Vercel + Neon)
 
-This app visualizes uploaded delay-research runs from Neon.
+This app visualizes:
+
+- all-market Polymarket opportunity scans
+- lag backtest runs
 
 ## Local setup
 
@@ -20,6 +23,7 @@ Initialize schema and upload latest run data:
 ```bash
 npm run db:init
 npm run db:upload
+npm run db:upload-scan
 ```
 
 Run locally:
@@ -44,5 +48,20 @@ Then upload run data from your local machine:
 cd web
 npm run db:init
 npm run db:upload
+npm run db:upload-scan
+
 ```
 
+## Market scan workflow
+
+From repository root:
+
+```bash
+uv run python polymarket_research/scan_all_markets.py --max-pages 12 --deep-limit 120 --out-dir data/polymarket_scan
+```
+
+Then from `web/`:
+
+```bash
+npm run db:upload-scan
+```

@@ -63,3 +63,15 @@ Before live capital, require:
 - acceptable max drawdown
 - paper-trading forward validation
 
+## 4) Scan all active markets for edge structures
+
+```bash
+uv run python polymarket_research/scan_all_markets.py \
+  --max-pages 12 \
+  --deep-limit 120 \
+  --out-dir data/polymarket_scan
+```
+
+Outputs:
+- `market_scan_*.csv`: per-market metrics and strategy recommendations
+- `market_scan_*_summary.json`: top opportunities + aggregate counts

@@ -14,8 +14,8 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Autoresearch Results",
-  description: "Polymarket delay-research dashboard powered by Neon + Vercel",
+  title: "Polymarket Profit Lab",
+  description: "All-market opportunity scanner and backtest dashboard powered by Neon + Vercel",
 };
 
 export default function RootLayout({
@@ -29,4 +29,3 @@ export default function RootLayout({
     </html>
   );
 }
-

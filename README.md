@@ -91,6 +91,7 @@ This fork includes a paper-trading research scaffold under `polymarket_research/
 - `find_markets.py` to discover active markets + token IDs
 - `collect_delay_data.py` to record Polymarket + BTC reference snapshots
 - `backtest_delay.py` to test lag-based entry/exit logic with fees/slippage assumptions
+- `scan_all_markets.py` to scan all active markets and rank opportunity structures
 
 Quick start:
 
@@ -98,6 +99,7 @@ Quick start:
 uv run python polymarket_research/find_markets.py --pattern "bitcoin|btc|up or down"
 uv run python polymarket_research/collect_delay_data.py --market-slug "..." --up-token-id "..." --down-token-id "..."
 uv run python polymarket_research/backtest_delay.py --grid --input data/polymarket_delay/snapshots.jsonl
+uv run python polymarket_research/scan_all_markets.py --max-pages 12 --deep-limit 120 --out-dir data/polymarket_scan
 ```
 
 See `polymarket_research/README.md` for details.
@@ -111,6 +113,7 @@ cd web
 npm install
 npm run db:init
 npm run db:upload
+npm run db:upload-scan
 npm run dev
 ```
 

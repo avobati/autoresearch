@@ -56,4 +56,70 @@ CREATE TABLE IF NOT EXISTS strategy_results (
 );
 `;
 
+await sql`
+CREATE TABLE IF NOT EXISTS market_scan_runs (
+  scan_id TEXT PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  market_count INTEGER NOT NULL,
+  deep_priced_count INTEGER NOT NULL,
+  positive_buy_arb_count INTEGER NOT NULL DEFAULT 0,
+  positive_sell_arb_count INTEGER NOT NULL DEFAULT 0,
+  positive_buy_arb_fresh_count INTEGER NOT NULL DEFAULT 0,
+  positive_sell_arb_fresh_count INTEGER NOT NULL DEFAULT 0,
+  notes TEXT,
+  source_csv TEXT,
+  source_summary TEXT
+);
+`;
+
+await sql`
+ALTER TABLE market_scan_runs
+ADD COLUMN IF NOT EXISTS positive_buy_arb_fresh_count INTEGER NOT NULL DEFAULT 0;
+`;
+
+await sql`
+ALTER TABLE market_scan_runs
+ADD COLUMN IF NOT EXISTS positive_sell_arb_fresh_count INTEGER NOT NULL DEFAULT 0;
+`;
+
+await sql`
+CREATE TABLE IF NOT EXISTS market_scan_rows (
+  id BIGSERIAL PRIMARY KEY,
+  scan_id TEXT NOT NULL REFERENCES market_scan_runs(scan_id) ON DELETE CASCADE,
+  market_id TEXT,
+  slug TEXT,
+  question TEXT,
+  end_date TEXT,
+  outcome_1 TEXT,
+  outcome_2 TEXT,
+  token_1 TEXT,
+  token_2 TEXT,
+  mid_1 DOUBLE PRECISION,
+  mid_2 DOUBLE PRECISION,
+  mid_sum DOUBLE PRECISION,
+  complement_gap DOUBLE PRECISION,
+  spread DOUBLE PRECISION,
+  volume24hr DOUBLE PRECISION,
+  liquidity DOUBLE PRECISION,
+  one_hour_change DOUBLE PRECISION,
+  one_day_change DOUBLE PRECISION,
+  movement_to_spread DOUBLE PRECISION,
+  maker_edge_est DOUBLE PRECISION,
+  taker_reversion_est DOUBLE PRECISION,
+  confidence DOUBLE PRECISION,
+  base_score DOUBLE PRECISION,
+  recommendation TEXT,
+  buy_both_cost DOUBLE PRECISION,
+  sell_both_credit DOUBLE PRECISION,
+  arb_buy_both_edge DOUBLE PRECISION,
+  arb_sell_both_edge DOUBLE PRECISION,
+  book_age_ms DOUBLE PRECISION,
+  book_fresh BOOLEAN
+);
+`;
+
+await sql`
+CREATE INDEX IF NOT EXISTS idx_market_scan_rows_scan_id ON market_scan_rows(scan_id);
+`;
+
 console.log("Neon schema initialized.");
