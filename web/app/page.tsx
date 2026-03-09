@@ -21,6 +21,7 @@ import {
   type WithdrawalRequest,
 } from "../lib/db";
 import { createFundingIntent, createWithdrawalRequest } from "./actions";
+import { SolanaWalletPanel } from "./components/solana-wallet-panel";
 
 type Mode = "overall" | "arb" | "maker" | "momentum";
 
@@ -137,6 +138,7 @@ export default async function Page({
     envText(process.env.NEXT_PUBLIC_SOLANA_USDC_MINT) ?? "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
   const solanaLabel = envText(process.env.NEXT_PUBLIC_SOLANA_LABEL) ?? "Polymarket Profit Lab";
   const solanaMessage = envText(process.env.NEXT_PUBLIC_SOLANA_MESSAGE) ?? "Funding deposit";
+  const solanaRpcUrl = envText(process.env.NEXT_PUBLIC_SOLANA_RPC_URL);
   const hasSolanaAddress = Boolean(solanaAddress && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(solanaAddress));
   const solDepositLink = hasSolanaAddress
     ? buildSolanaPayUrl(solanaAddress!, { amount: 0.1, label: solanaLabel, message: solanaMessage })
@@ -219,6 +221,13 @@ export default async function Page({
                 </label>
                 <button type="submit">Notify Funding Intent</button>
               </form>
+
+              <SolanaWalletPanel
+                treasuryAddress={solanaAddress}
+                network={solanaNetwork}
+                rpcUrl={solanaRpcUrl}
+                createWithdrawalRequestAction={createWithdrawalRequest}
+              />
             </div>
 
             <div className="fund-col">
@@ -254,37 +263,6 @@ export default async function Page({
             </div>
 
             <div className="fund-col">
-              <h3>Request Withdrawal</h3>
-              <form action={createWithdrawalRequest} className="fund-form">
-                <label>
-                  Amount (USD)
-                  <input name="amount_usd" type="number" min="1" step="1" required />
-                </label>
-                <label>
-                  Asset
-                  <select name="asset" defaultValue="USDC" required>
-                    <option value="USDC">USDC</option>
-                    <option value="SOL">SOL</option>
-                  </select>
-                </label>
-                <label>
-                  Solana destination address
-                  <input
-                    name="destination_address"
-                    type="text"
-                    minLength={32}
-                    maxLength={44}
-                    required
-                    placeholder="Base58 Solana address"
-                  />
-                </label>
-                <label>
-                  Note
-                  <input name="note" type="text" maxLength={200} placeholder="e.g. Weekly payout" />
-                </label>
-                <button type="submit">Create Withdrawal Request</button>
-              </form>
-
               <h3>Recent Withdrawals</h3>
               {withdrawalRequests.length === 0 ? (
                 <p className="empty">No withdrawal requests yet.</p>

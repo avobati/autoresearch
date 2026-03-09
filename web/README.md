@@ -19,6 +19,7 @@ DATABASE_URL=postgresql://<user>:<password>@<host>/<db>?sslmode=require
 NEXT_PUBLIC_SOLANA_ADDRESS=<your_solana_deposit_wallet>
 NEXT_PUBLIC_SOLANA_NETWORK=mainnet
 NEXT_PUBLIC_SOLANA_USDC_MINT=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+NEXT_PUBLIC_SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
 ```
 
 Initialize schema and upload latest run data:
@@ -72,6 +73,12 @@ npm run db:upload-scan
 ```
 
 ## Funding workflow
+
+Secure wallet mode:
+
+- use `Connect Wallet` in the dashboard to sign deposits locally in Phantom/Solflare
+- withdrawal requests can be submitted directly to the connected wallet address
+- private keys are never stored in this app
 
 Record a confirmed funding event:
 

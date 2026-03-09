@@ -139,6 +139,46 @@ a {
   cursor: pointer;
 }
 
+.wallet-panel {
+  margin-top: 0.8rem;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 0.7rem;
+  background: #fdfcf5;
+}
+
+.wallet-panel h3 {
+  margin: 0.3rem 0 0.5rem;
+}
+
+.wallet-note {
+  color: var(--muted);
+  font-size: 0.84rem;
+  margin: 0.35rem 0;
+}
+
+.wallet-actions {
+  display: flex;
+  gap: 0.45rem;
+  margin-bottom: 0.6rem;
+}
+
+.wallet-actions button {
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: #eaf7f2;
+  color: #075f43;
+  padding: 0.38rem 0.65rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.wallet-actions button:disabled,
+.fund-form button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .mini-list {
   margin: 0;
   padding-left: 1rem;
