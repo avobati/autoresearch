@@ -119,6 +119,14 @@ npm run dev
 
 Deployment guide is in `web/README.md`.
 
+## Daily Pipeline
+
+To run the full daily profit-lab pipeline (scan -> collect -> backtest -> Neon upload):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\run_daily_profit_lab.ps1
+```
+
 ## License
 
 MIT
