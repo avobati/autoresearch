@@ -84,6 +84,24 @@ I think these would be the reasonable hyperparameters to play with. Ask your fav
 - [trevin-creator/autoresearch-mlx](https://github.com/trevin-creator/autoresearch-mlx) (MacOS)
 - [jsegov/autoresearch-win-rtx](https://github.com/jsegov/autoresearch-win-rtx) (Windows)
 
+## Optional: Polymarket Delay Research
+
+This fork includes a paper-trading research scaffold under `polymarket_research/`:
+
+- `find_markets.py` to discover active markets + token IDs
+- `collect_delay_data.py` to record Polymarket + BTC reference snapshots
+- `backtest_delay.py` to test lag-based entry/exit logic with fees/slippage assumptions
+
+Quick start:
+
+```bash
+uv run python polymarket_research/find_markets.py --pattern "bitcoin|btc|up or down"
+uv run python polymarket_research/collect_delay_data.py --market-slug "..." --up-token-id "..." --down-token-id "..."
+uv run python polymarket_research/backtest_delay.py --grid --input data/polymarket_delay/snapshots.jsonl
+```
+
+See `polymarket_research/README.md` for details.
+
 ## License
 
 MIT
