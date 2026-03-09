@@ -324,6 +324,23 @@ export function SolanaWalletPanel({
         </>
       )}
 
+      <h3>Backfill Existing Deposit</h3>
+      <form action={recordWalletDepositAction} className="fund-form">
+        <label>
+          Deposit tx signature
+          <input name="tx_ref" type="text" minLength={20} required placeholder="Paste confirmed Solana tx signature" />
+        </label>
+        <label>
+          USD value to record
+          <input name="amount_usd" type="number" min="1" step="0.01" required />
+        </label>
+        <label>
+          Note
+          <input name="note" type="text" maxLength={200} defaultValue="Backfilled wallet deposit" />
+        </label>
+        <button type="submit">Backfill Deposit To Dashboard</button>
+      </form>
+
       <h3>Withdraw To Connected Wallet</h3>
       <form action={createWithdrawalRequestAction} className="fund-form">
         <label>
