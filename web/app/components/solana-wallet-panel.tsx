@@ -27,7 +27,8 @@ type SolanaWalletProvider = {
   isConnected?: boolean;
   connect: (opts?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey: PublicKey }>;
   disconnect: () => Promise<void>;
-  signAndSendTransaction: (tx: Transaction) => Promise<{ signature: string }>;
+  signAndSendTransaction?: (tx: Transaction) => Promise<{ signature: string } | string>;
+  signTransaction?: (tx: Transaction) => Promise<Transaction>;
 };
 
 declare global {
@@ -41,7 +42,7 @@ declare global {
 function getProvider(): SolanaWalletProvider | null {
   if (typeof window === "undefined") return null;
   const candidate = window.phantom?.solana ?? window.solana ?? window.solflare ?? null;
-  if (!candidate?.connect || !candidate?.signAndSendTransaction) return null;
+  if (!candidate?.connect || (!candidate?.signAndSendTransaction && !candidate?.signTransaction)) return null;
   return candidate;
 }
 
@@ -134,6 +135,14 @@ export function SolanaWalletPanel({
       const connection = new Connection(endpoint, "confirmed");
       const from = new PublicKey(walletAddress);
       const to = new PublicKey(treasuryAddress);
+      const lamports = Math.round(amount * LAMPORTS_PER_SOL);
+      const balance = await connection.getBalance(from, "confirmed");
+      const feeBuffer = 10_000;
+      if (balance < lamports + feeBuffer) {
+        setDepositStatus("Insufficient SOL balance for amount + network fee.");
+        setPendingDeposit(false);
+        return;
+      }
       const latest = await connection.getLatestBlockhash("finalized");
 
       const tx = new Transaction();
@@ -143,20 +152,36 @@ export function SolanaWalletPanel({
         SystemProgram.transfer({
           fromPubkey: from,
           toPubkey: to,
-          lamports: Math.round(amount * LAMPORTS_PER_SOL),
+          lamports,
         })
       );
 
-      const result = await provider.signAndSendTransaction(tx);
-      await connection.confirmTransaction(
-        { signature: result.signature, blockhash: latest.blockhash, lastValidBlockHeight: latest.lastValidBlockHeight },
-        "confirmed"
-      );
+      let signature: string | null = null;
+      if (provider.signAndSendTransaction) {
+        const result = await provider.signAndSendTransaction(tx);
+        signature = typeof result === "string" ? result : result.signature;
+      } else if (provider.signTransaction) {
+        const signed = await provider.signTransaction(tx);
+        signature = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+      }
+      if (!signature) {
+        throw new Error("Wallet did not return a transaction signature.");
+      }
 
-      setDepositSig(result.signature);
-      setDepositStatus("Deposit confirmed on-chain. Use Notify Funding Intent below to record it in the dashboard.");
-    } catch {
-      setDepositStatus("Deposit failed or was rejected in wallet.");
+      setDepositSig(signature);
+
+      try {
+        await connection.confirmTransaction(signature, "confirmed");
+        setDepositStatus("Deposit confirmed on-chain. Use Notify Funding Intent below to record it in the dashboard.");
+      } catch {
+        setDepositStatus("Transaction submitted. Confirmation is pending; check the tx link and retry status in wallet.");
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Deposit failed or was rejected in wallet.";
+      setDepositStatus(`Deposit error: ${message}`);
     } finally {
       setPendingDeposit(false);
     }
