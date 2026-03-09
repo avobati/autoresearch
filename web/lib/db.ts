@@ -195,6 +195,8 @@ export async function getTopOpportunityRows(
         arb_buy_both_edge, arb_sell_both_edge, book_age_ms, book_fresh
       FROM market_scan_rows
       WHERE scan_id = ${scanId}
+        AND book_fresh = true
+        AND GREATEST(COALESCE(arb_buy_both_edge, -99), COALESCE(arb_sell_both_edge, -99)) > 0
       ORDER BY GREATEST(COALESCE(arb_buy_both_edge, -99), COALESCE(arb_sell_both_edge, -99)) DESC, base_score DESC
       LIMIT ${limit}
     `;
@@ -208,6 +210,9 @@ export async function getTopOpportunityRows(
         arb_buy_both_edge, arb_sell_both_edge, book_age_ms, book_fresh
       FROM market_scan_rows
       WHERE scan_id = ${scanId}
+        AND volume24hr >= 2000
+        AND spread BETWEEN 0.005 AND 0.08
+        AND confidence >= 0.15
       ORDER BY maker_edge_est DESC, volume24hr DESC, confidence DESC
       LIMIT ${limit}
     `;
@@ -221,6 +226,9 @@ export async function getTopOpportunityRows(
         arb_buy_both_edge, arb_sell_both_edge, book_age_ms, book_fresh
       FROM market_scan_rows
       WHERE scan_id = ${scanId}
+        AND volume24hr >= 2000
+        AND spread <= 0.03
+        AND movement_to_spread >= 2
       ORDER BY movement_to_spread DESC, volume24hr DESC, confidence DESC
       LIMIT ${limit}
     `;
@@ -233,6 +241,9 @@ export async function getTopOpportunityRows(
       arb_buy_both_edge, arb_sell_both_edge, book_age_ms, book_fresh
     FROM market_scan_rows
     WHERE scan_id = ${scanId}
+      AND volume24hr >= 1000
+      AND spread BETWEEN 0.001 AND 0.08
+      AND confidence >= 0.1
     ORDER BY base_score DESC, confidence DESC, volume24hr DESC
     LIMIT ${limit}
   `;
